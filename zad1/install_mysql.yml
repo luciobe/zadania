@@ -1,0 +1,47 @@
+---
+- hosts: localhost
+  become: true
+
+  tasks:
+   - name: Dodaj repozytorium do yuma
+     yum:
+      name: https://dev.mysql.com/get/mysql80-community-release-el7-1.noarch.rpm
+      state: present
+
+   - name: Zainstaluj mysql
+     yum:
+      name:
+      - mysql-community-server
+      - mysql-community-client
+      state: present
+
+   - name: uruchom usluge i upewnij sie ze bedzie sie uruchammiac przy starcie systemu
+     service: 
+      name=mysqld 
+      state=started 
+      enabled=true
+
+   - name: Sprawdz jakie jest haslo roota mysql
+     shell: |
+      password_match=`awk '/A temporary password is generated for/ {a=$0} END{ print a }' /var/log/mysqld.log | awk '{print $(NF)}'`
+      echo $password_match
+      printf  "[client]\\nuser=root\\npassword=$password_match" > /root/.my.cnf
+     register: check_pass
+     notify: restart mysql
+
+   - meta: flush_handlers
+
+   - debug:
+      var: check_pass
+
+   - name: Sprawdz czy mysql działa
+     service:
+      name: mysqld
+      state: started
+
+  handlers:
+  - name: restart mysql
+    service: 
+      name: mysqld 
+      state: restarted
+
